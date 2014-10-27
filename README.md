@@ -31,29 +31,29 @@ following work, i will program to realize the whole system.
 The architecture of this system is described as following:
 
 
-     	  [RDP Server]
-			--------									--------
-										<ip-a,port-a>		
-	|----->	 Host A								/----->	 Host B
-	|										   /
-	|		--------						  /			--------
-	|			|							 /
-	|			|						    /
-	|			|				--------   /
-   r|			|						  /
-   d|			|------------->  Server  
-   p|		<ip-a,port-a>	  /			  \
-	|					     /	--------   \
-	|						/				\
-	|					   /				 \
-	|		--------	  /					  \         --------
-	|				     /					   \
-	|-----  Host C <---/					    \----->  Host D
-					 <ip-a,port-a>		<ip-a,port-a>
-			--------									--------
-		  [RDP Client]
+          [RDP Server]
+            --------                                     --------
+                                        <ip-a,port-a>        
+    |----->   Host A                             /----->  Host B
+    |                                           /
+    |       --------                           /         --------
+    |           |                             /
+    |           |                            /
+    |           |                --------   /
+   r|           |                          /
+   d|           |------------->   Server  
+   p|        <ip-a,port-a>     /           \
+    |                         /  --------   \
+    |                        /               \
+    |                       /                 \
+    |       --------       /                   \         --------
+    |                     /                     \
+    |-----   Host C  <---/                       \----->  Host D
+                     <ip-a,port-a>        <ip-a,port-a>
+            --------                                     --------
+          [RDP Client]
 
-	
+    
 Take the compatibility into consideration, i will code in JAVA.
 
 Thanks for any suggestion, if you have any suggestion, please email to
