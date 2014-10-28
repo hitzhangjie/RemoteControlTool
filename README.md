@@ -25,6 +25,9 @@ a LINUX host, it will run 'xrdp' as the rdp x11 server. While, on a WINDOWS
 host, rdp service will be turned on. With respect to the rdp client, 'remmina'
 will be used on LINUX host, while on WINDOWS, the default 'mstsc' will be used.
 
+Ah, i found that, if we use 'krdc' instead of 'remmina', then we can
+conveniently start a rdp request through cli. And, That' we want.
+
 I have tested the needed software tools on Ubuntu/Windows platform. The
 following work, i will program to realize the whole system.
 
