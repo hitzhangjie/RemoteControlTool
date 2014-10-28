@@ -70,7 +70,6 @@ class Client {
 
 		String [] dottedNums = ip.split("\\.");
 
-		System.out.println(ip+":"+dottedNums.length);
 		if(dottedNums.length==4) {
 			for(String num_s : dottedNums) {
 				try {
@@ -165,14 +164,24 @@ class HeartbeatTimerTask extends Thread {
 			while(!connSocket.isClosed()) {
 	
 				byte [] heartbeat = (new Date().toString()+"  hello, i am client").getBytes();
-				byte [] response = new byte[100];
+				byte [] response = new byte[1000];
 				out.write(heartbeat);
-				while(in.read(response)>=0)
-					System.out.println(new String(response));
+
+				// 4-bytes number
+				in.read(response, 0, 4);
+				int length = 
+					Integer.parseInt(new String(response).trim());
+					
+				String body = "";
+				while(length>0) {
+					System.out.println("keep reading ...");
+					length -= in.read(response, 0, length);
+					body += new String(response);
+				}
+				System.out.println("done");
+				System.out.println(body);
 	
-				System.out.println("...");
-	
-				Thread.sleep(2000);
+				Thread.sleep(1000);
 			}
 		}
 		catch (Exception e) {

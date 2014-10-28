@@ -1,0 +1,5 @@
+1. non-static method Thread.getId() cannot be referenced within a static context:
+use Thread.currentThread().getId() instead of Thread.getId();
+
+2. Integer.parseInt, for input string "0116", it throws number format exception!
+use trim(), but "0116" doesn't contain any spaces, i am still confused.

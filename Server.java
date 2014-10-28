@@ -1,5 +1,7 @@
 /**
- *
+ * Server side programme
+ * @author zhangjie
+ * @date 2014-10-28
  *
  */
 
@@ -33,21 +35,25 @@ class Server {
 		server.run();
 	}
 
+	// server entry
 	public void run() {
+
 		try {
 
 			listen_socket = new ServerSocket(PORT);
-	
 			Socket conn_socket = null;
 	
 			System.out.println("Server is listening ...");
+
 			while((conn_socket=listen_socket.accept())!=null) {
+
 				if(clientsList==null)
 					clientsList = new ArrayList<SocketAddress>();
 				if(socketsList==null)
 					socketsList = new ArrayList<Socket>();
 
-				SocketAddress remoteAddress = conn_socket.getRemoteSocketAddress();
+				SocketAddress remoteAddress = 
+					conn_socket.getRemoteSocketAddress();
 
 				synchronized(LOCK) {
 					// store
@@ -55,92 +61,33 @@ class Server {
 					socketsList.add(conn_socket);
 				}
 
-				// 服务器创建两类线程，一类用于检查socket链表中无效的socket将
-				// 其移除；另一类用于与客户端交互，这里的交互只涉及到包的响应
-				// ；
-				// 为了简化客户端的设计，服务端每次将所有的客户端信息发送给客
-				// 户端；
-	
+				// create a new thread used to process cilent heartbeat
 				new ClientProcessThread(conn_socket).start();
+
+				// create a new thread used to clean offline clients and send
+				// clients' data to clients
+				new ClientCleanThread().start();
 	
-				System.out.println("Server is listening ... ");
-				Thread.sleep(2000);
+				Thread.sleep(1000);
+				System.out.println("Server is listening ...");
 			}
 		}
 		catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
-
-
-	/**
-	 * generate the clients' <address,port> info, not including current
-	 * client. only one thread can enter this function to avoid read/write
-	 * conflict for the shared data.
-	 * @clientAddr current client's SocketAddress
-	 * @return return other clients' addresses info
-	 */
-	synchronized public static String getClientsAddrInfo(SocketAddress clientAddr) {
-
-		String info = "";
-		ArrayList<Integer> markedAsRemovedList = null;
-
-		for(SocketAddress addr : clientsList) {
-
-			if(addr == clientAddr)
-				continue;
-
-			int index = clientsList.indexOf(addr);
-			Socket socket = socketsList.get(index);
-
-			if(socket.isClosed()) {
-
-				if(markedAsRemovedList==null) 
-					markedAsRemovedList = new ArrayList<Integer>();
-
-				markedAsRemovedList.add(index);
-			}
-			else {
-				String clientInfo = ((InetSocketAddress)addr).getAddress().toString();
-				int port = ((InetSocketAddress)addr).getPort();
-				info += clientInfo+":"+port+";";
-			}
-		}
-
-		// remove offline clients
-		removeOfflineClients(markedAsRemovedList);
-
-		return info;
-	}
-
-	/**
-	 * remove offline clients
-	 * @param removeList which stores the index that the client waiting to be
-	 *					 removed located at
-	 */
-	synchronized public static void removeOfflineClients(ArrayList<Integer> removeList) {
-		
-		if(removeList==null || removeList.size()==0)
-			return;
-
-		for(Integer index: removeList) {
-
-			System.out.println( "client removed: ip:"+((InetSocketAddress)clientsList.get(index)).getAddress().toString());
-
-			clientsList.remove(index);
-			socketsList.remove(index);
-		}
-
-	}
-
 }
 
+/**
+ * this class is used to interact with clients with the heartbeats
+ */
 class ClientProcessThread extends Thread {
 
 	public Socket connSocket = null;
 
 	public InputStream in = null;
 	public OutputStream out = null;
+
 
 	/**
 	 *
@@ -159,11 +106,68 @@ class ClientProcessThread extends Thread {
 				e.printStackTrace();
 			}
 		}
-	
 	}
 
 	/**
-	 *
+	 * generate the clients' <address,port> info, not including current
+	 * client. only one thread can enter this function to avoid read/write
+	 * conflict for the shared data.
+	 * @clientAddr current client's SocketAddress
+	 * @return return other clients' addresses info
+	 */
+	public String getClientsAddrInfo(SocketAddress clientAddr) {
+
+		String info = "";
+
+		for(SocketAddress addr : Server.clientsList) {
+
+			if(addr == clientAddr)
+				continue;
+
+			int index = Server.clientsList.indexOf(addr);
+			Socket socket = Server.socketsList.get(index);
+
+			if(socket.isClosed())
+				continue;
+			else {
+				String clientInfo = ((InetSocketAddress)addr).getAddress().toString();
+				int port = ((InetSocketAddress)addr).getPort();
+				info += clientInfo+":"+port+";";
+			}
+		}
+
+		return info;
+	}
+
+
+	/**
+	 * write the length and msg to the client
+	 */
+	public void write(String msg, OutputStream out) {
+		
+		int ct = 0;
+
+		if(out==null || msg==null || msg.length()==0)
+			return;
+
+		int length = msg.length();
+		String s = null;
+		if(length<=1000)
+			s = String.format("%04d", length)+new String(msg);
+		else
+			s = "1000"+new String(msg.substring(0,999));
+
+		try {
+			System.out.println(s);
+			out.write(s.getBytes());
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * thread entry
 	 */
 	public void run() {
 
@@ -175,28 +179,106 @@ class ClientProcessThread extends Thread {
 			}
 	
 			while(!connSocket.isClosed()) {
+
+				System.out.println("Thread "+Thread.currentThread().getId()+" waiting ...");
 		
 				byte [] buf = new byte[100];
+				String heartbeat = "";
+
+				//while(in.read(buf)>=0)
+				//while(in.read(buf)>0)
 				in.read(buf);
-	
-				synchronized(Server.LOCK) {
-					SocketAddress remoteAddress = connSocket.getRemoteSocketAddress();
-					out.write(("client ip:"
-								+((InetSocketAddress)remoteAddress).getAddress().toString())
-								.getBytes() );
-					out.write( ("client echo:"+buf).getBytes() ) ;
-			
-					String info = Server.getClientsAddrInfo(remoteAddress);
-					out.write(("START:"+buf).getBytes());
-				}
-		
-				Thread.sleep(3000);
-				System.out.println("...");
+				heartbeat += new String(buf);
+
+				// heartbeat
+				String msg = "Thread "+Thread.currentThread().getId()+" ACKED, "+heartbeat;
+				write(msg, out);
+
+				// client address
+				SocketAddress remoteAddress = connSocket.getRemoteSocketAddress();
+				msg = "Thread "+Thread.currentThread().getId()
+							+" client ip:"
+							+((InetSocketAddress)remoteAddress).getAddress().toString();
+				write(msg, out);
+
+				// other clients' address info
+				msg = getClientsAddrInfo(remoteAddress);
+				msg = new Date().toString()+" CLIENTSADDR:"+msg;
+				write(msg, out);
+
+				Thread.sleep(1000);
 			}
 		}
 		catch (Exception e) {
 			e.printStackTrace();
 		}
 
+	}
+}
+
+/**
+ * this class is used to clean the offline cilents
+ */
+class ClientCleanThread extends Thread {
+	
+	// mark the client index in Server.socketsList, Server.clientsList
+	public ArrayList<Integer> markedAsRemovedList = null;
+
+	/**
+	 *
+	 */
+	public ClientCleanThread() {
+		markedAsRemovedList = new ArrayList<Integer>();
+	}
+
+	/**
+	 * remove offline clients
+	 * @param removeList which stores the index that the client waiting to be
+	 *					 removed located at
+	 */
+	public void removeOfflineClients(ArrayList<Integer> removeList) {
+		
+		if(removeList==null || removeList.size()==0)
+			return;
+
+		for(Integer index: removeList) {
+
+			System.out.println( "client removed: ip:"
+					+((InetSocketAddress)Server.clientsList.get(index)).getAddress().toString());
+
+			Server.clientsList.remove(index);
+			Server.socketsList.remove(index);
+		}
+
+	}
+
+	/**
+	 * thread entry
+	 */
+	public void run() {
+
+		try {
+
+			markedAsRemovedList.clear();
+	
+			for(SocketAddress addr : Server.clientsList) {
+				
+				int index = Server.clientsList.indexOf(addr);
+				Socket socket = Server.socketsList.get(index);
+	
+				if(socket.isClosed()) {
+					markedAsRemovedList.add(index);
+					continue;
+				}
+			}
+	
+			synchronized(Server.LOCK) {
+	
+				removeOfflineClients(markedAsRemovedList);
+			}
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 }
