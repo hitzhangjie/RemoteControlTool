@@ -249,10 +249,8 @@ class RDP2ClientThread extends Thread {
 			else
 				cmd = "clear";
 
-			// read user input
-			//Scanner scanner = new Scanner(System.in);
-
 			while(true) {
+
 				Process process = runtime.exec(cmd);
 	
 				if(process.waitFor()!=0)
@@ -266,15 +264,19 @@ class RDP2ClientThread extends Thread {
 				}
 
 				// scanner
-				/*
-				scanner.reset();
+				Scanner scanner = new Scanner(System.in);
 				if(scanner.hasNextInt()) {
 					int sel = scanner.nextInt();
-					String rdpRequest = "krdc rdp://"+Client.neighboursList.get(sel);
-					Process p = runtime.exec(rdpRequest);
-					// p.waitFor
+
+					if(sel>Client.neighboursList.size()-1 || sel<0) {
+						System.out.println("you select invalid client["+sel+"]");
+					}
+					else {
+						String rdpRequest = "krdc rdp://"+Client.neighboursList.get(sel);
+						Process p = runtime.exec(rdpRequest);
+						//p.waitFor
+					}
 				}
-				*/
 
 				Thread.currentThread().sleep(2000);
 
