@@ -18,6 +18,12 @@ class Client {
 	public String server_ip = null;
 	public String server_port = null;
 
+	// indicate os on which this program runs
+	public static String client_os = null;
+
+	// store other clients' ip address
+	public static ArrayList<String> neighboursList = null;
+
 	/**
 	 *
 	 */
@@ -25,6 +31,15 @@ class Client {
 		
 		this.server_ip = ip;
 		this.server_port = port;
+
+		Properties props = System.getProperties();
+		String osname = props.getProperty("os.name").toLowerCase();
+		if(osname.contains("windows"))
+			this.client_os = "win";
+		else if(osname.contains("linux"))
+			this.client_os = "linux";
+
+		this.neighboursList = new ArrayList<String>();
 	}
 
 	/**
@@ -44,6 +59,9 @@ class Client {
 	
 			// send heartbeat to the server
 			new HeartbeatTimerTask(conn_socket).start();
+			// display the clients' list and handle the user selection
+			new RDP2ClientThread().start();	
+
 		}
 		catch (Exception e) {
 			e.printStackTrace();
@@ -97,7 +115,6 @@ class Client {
 	 */
 	public static boolean isValidPort(String port) {
 		
-		System.out.println(port);
 		if(port==null || port.length()==0)
 			return false;
 
@@ -121,10 +138,6 @@ class Client {
 			return;
 		}
 
-		// 客户端创建两类线程，一类用于与服务器的第二类线程交换心跳包，并且接
-		// 收服务器的第一类线程发送的客户端地址列表；
-		// 另一类用于监听用户的输入请求，向用户选定的主机发送rdp请求，建立远程
-		// 桌面连接
 		Client client = new Client(args[0], args[1]);
 		client.run();
 	}
@@ -153,6 +166,7 @@ class HeartbeatTimerTask extends Thread {
 				e.printStackTrace();
 			}
 		}
+
 	}
 
 	public void run () {
@@ -174,18 +188,103 @@ class HeartbeatTimerTask extends Thread {
 					
 				String body = "";
 				while(length>0) {
-					System.out.println("keep reading ...");
+					//System.out.println("keep reading ...");
 					length -= in.read(response, 0, length);
 					body += new String(response);
 				}
-				System.out.println("done");
-				System.out.println(body);
-	
+				//System.out.println("done");
+				body = body.trim();
+				//System.out.println(body);
+
+				// parse the body part to extract the other clients' addresses
+				// into neighboursList
+				if(body.contains("CLIENTSADDR:")) {
+					String body_tmp = body.substring(body.indexOf("/"));
+					String [] ip_tmp = body_tmp.split(";");
+				
+					Client.neighboursList.clear();
+					for(String client : ip_tmp)	{
+						Client.neighboursList.add(client.split(":")[0].substring(1));
+						//System.out.print(Client.neighboursList.get(Client.neighboursList.size()-1)+" ");
+					}
+					//System.out.println("");
+				}
+
 				Thread.sleep(1000);
 			}
 		}
 		catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+}
+
+/**
+ *
+ */
+class RDP2ClientThread extends Thread {
+	
+	/**
+	 *
+	 */
+	public RDP2ClientThread() {
+	}
+
+	/**
+	 *
+	 */
+	public void run() {
+
+		try {
+
+			// reset current shell content
+			Runtime runtime = Runtime.getRuntime();
+	
+			String cmd = null;
+	
+			if(Client.client_os.equals("win"))
+				cmd = "cls";
+			else if(Client.client_os.equals("linux"))
+				cmd = "clear";
+			else
+				cmd = "clear";
+
+			// read user input
+			//Scanner scanner = new Scanner(System.in);
+
+			while(true) {
+				Process process = runtime.exec(cmd);
+	
+				if(process.waitFor()!=0)
+					System.out.println("sub-process to clear the console exited abnormally");
+	
+				// display the clients list
+				int index = 0;
+				System.out.println(String.format("%5s %20s", "client", "ipaddress"));
+				for(String client : Client.neighboursList) {
+					System.out.println(String.format("%5d %20s", index++, client));
+				}
+
+				// scanner
+				/*
+				scanner.reset();
+				if(scanner.hasNextInt()) {
+					int sel = scanner.nextInt();
+					String rdpRequest = "krdc rdp://"+Client.neighboursList.get(sel);
+					Process p = runtime.exec(rdpRequest);
+					// p.waitFor
+				}
+				*/
+
+				Thread.currentThread().sleep(2000);
+
+			}
+
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+			
+				
 	}
 }
